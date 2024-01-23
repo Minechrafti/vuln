@@ -5,9 +5,9 @@ import sqlite3
 conn = sqlite3.connect('vulnerable_database.db')
 
 
-conn.cursor.execute('drop table if exists users')
-conn.cursor.execute('create table users (id INTEGER PRIMARY KEY AUTO INCREMENT, username TEXT, password TEXT)')
-conn.cursor.execute('insert into users (username,password) values ("test", "test")')
+conn.cursor().execute('drop table if exists users')
+conn.cursor().execute('create table users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, password TEXT)')
+conn.cursor().execute('insert into users (username,password) values ("test", "test")')
 
 conn.commit()
 conn.close()
@@ -52,15 +52,33 @@ def index():
     print('t')
     return '''
         <html>
+            <head>
+            <style>
+            ul {
+                list-style-type: none;
+                display: flex;
+                flex-wrap: wrap;
+            }
+            li {
+                margin-right: 3vw
+            }
+            </style>
+            </head>
+            
+            <body>
+            
+            <nav>
+            <ul>
+            <li><a href='/os' >os</a></li>
+            <li><a href='/sql_injection' >sql_injection</a></li>
+            <li><a href='/xss_reflected' >xss_reflected</a></li>
+            <li><a href='/xss_stored' >xss_stored</a></li>
+            <li><a href='/ssti' >ssti</a></li>
+            </ul>
+            </nav>
             <h2>Welcome to a little OWASP-TOP-10 Demo</h2>
             <h2>To execute a vulnerability, go to the site and enter '?payload=<your_payload_here>' to the url</h2>
-            <nav>
-            <a href='/os' >os</a>
-            <a href='/sql_injection' >sql_injection</a>
-            <a href='/xss_reflected' >xss_reflected</a>
-            <a href='/xss_stored' >xss_stored</a>
-            <a href='/ssti' >ssti</a>
-            </nav>    
+            </body>    
         </html>
         '''
     
