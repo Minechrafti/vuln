@@ -1,5 +1,17 @@
 from flask import Flask, request
 import os
+import sqlite3
+
+conn = sqlite3.connect('vulnerable_database.db')
+
+
+conn.cursor.execute('drop table if exists users')
+conn.cursor.execute('create table users (id INTEGER PRIMARY KEY AUTO INCREMENT, username TEXT, password TEXT)')
+conn.cursor.execute('insert into users (username,password) values ("test", "test")')
+
+conn.commit()
+conn.close()
+
 
 app = Flask('app')
 
@@ -55,10 +67,38 @@ def index():
 @app.route('/sql-injection', methods=["GET"])
 def sqli():
     try:
-        injection = request.args.get('payload')
-        return injection
+        payload = request.args.get('payload')
     except:
-        return default_response
+            return default_response
+    queries = ['INSERT INTO users (username, password) VALUES ("test", {payload})', 'INSERT INTO users (username, password) VALUES ("test", "{payload}")', "INSERT INTO users (username, password) VALUES ('test', {payload})",  "INSERT INTO users (username, password) VALUES ('test', '{payload}')"]
+    errors = []
+    for query in queries:
+        try:
+            conn = sqlite3.connect('vulnerable_database.db')
+            conn.cursor.execute(query)
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            errors.append(str(e))
+            conn.rollback()
+            conn.close()
+        # If theres a ; in the query, maybe a vulnerable app would
+        # execute it as x queries, sqlite3 prevents that, therefore
+        # i split it to x queries and execute them after each other
+        if(query.__contains__(';')):
+            sub_queries = query.split(';')
+            for q in sub_queries:
+                try:
+                    conn = sqlite3.connect('vulnerable_database.db')
+                    conn.cursor.execute(q)
+                    conn.commit()
+                    conn.close()
+                except Exception as e:
+                    errors.append(str(e))
+                    conn.rollback()
+                    conn.close()
+    return default_response.replace('tmp', errors)
+        
 
 
 @app.route('/os', methods=['GET'])
