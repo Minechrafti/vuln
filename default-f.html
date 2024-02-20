@@ -1,0 +1,89 @@
+
+<html>
+<head>
+<style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    ul {
+      list-style-type: none;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      padding: 0;
+    }
+
+    li {
+      margin-right: 20px; /* Adjust as needed */
+    }
+
+    div {
+      margin: 0 auto;
+      width: 70vw; /* Adjust as needed */
+      text-align: center;
+    }
+    button {
+        background-color: blue;
+        color: white;
+        border: 1px solid;
+    }
+  </style>
+  <title>Vulnerable Web Application</title>
+</head>
+<body>
+<nav>
+  <ul>
+  <button onclick="window.location.href = '/'">Obvious</button>
+    <li><a href='/xss-reflected'>xss-reflected</a></li>
+    <li><a href='/xss-stored'>xss-stored</a></li>
+    <li><a href='/sql-injection'>sql-injection</a></li>
+    <li><a href='/os-injection'>os-injection</a></li>
+    <li><a href='/python-injection'>python-injection</a></li>
+    <li><a href='/ssti'>ssti</a></li>
+    <li><a href='/path_traversal'>path-traversal</a></li>
+  </ul>
+</nav>
+<section id='section'>
+<div>
+<h2> Vulnerable Web-Application </h2>
+</div>
+</section>
+<h3>Register for the Application</h3>
+<form onSubmit="send(event)">
+<div style="margin-top:3vh"><label>Username:        </label>   <input id=user placeholder='Username'></div> <br>
+<div style="margin-top:3vh"><label>Password:        </label>   <input id=pass placeholder='Password'></div> <br>
+<div style="margin-top:3vh"><label>Website :        </label>   <input id=webpage placeholder='Website'> </div> <br>
+<div style="margin-top:3vh"><label>Description :    </label>   <input id=desc placeholder='Website'> </div> <br>
+<button type=submit>submit</button>
+</form>
+<h2> Output </h2>
+<h2> tmp </h2>
+<script>
+let div = document.createElement('div')
+let h1 = document.createElement('h1')
+let name = window.location.href.split('/')[3]
+if(name.includes('?')) {
+    h1.innerHTML = name.split('?')[0]
+} else {
+    h1.innerHTML = name
+}
+
+div.appendChild(h1)
+document.getElementById('section').appendChild(div)
+function send(event) {
+    event.preventDefault();
+    if(window.location.href.includes('?')) {
+        let str = window.location.href.split('?')[0] + `?user=${btoa(document.getElementById('user').value)}&pass=${btoa(document.getElementById('pass').value)}&website=${btoa(document.getElementById('webpage').value)}&desc=${btoa(document.getElementById('desc').value)}`
+        alert(str)
+        window.location.href = str
+    } else {window.location.href = window.location.href+`?user=${btoa(document.getElementById('user').value)}&pass=${btoa(document.getElementById('pass').value)}&website=${btoa(document.getElementById('webpage').value)}&desc=${btoa(document.getElementById('desc').value)}`}
+    
+}
+</script>
+</body>
+</html>
+

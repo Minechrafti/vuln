@@ -1,0 +1,80 @@
+
+<html>
+<head>
+<style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    ul {
+      list-style-type: none;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      padding: 0;
+    }
+
+    li {
+      margin-right: 20px; /* Adjust as needed */
+    }
+
+    div {
+      margin: 0 auto;
+      width: 70vw; /* Adjust as needed */
+      text-align: center;
+    }
+  </style>
+  <title>Vulnerable Web Application</title>
+</head>
+<body>
+<nav>
+  <ul>
+    <button onclick="window.location.href = '/f'">Actual</button>
+    <li><a href='/xss-reflected'>xss-reflected</a></li>
+    <li><a href='/xss-stored'>xss-stored</a></li>
+    <li><a href='/sql-injection'>sql-injection</a></li>
+    <li><a href='/os-injection'>os-injection</a></li>
+    <li><a href='/python-injection'>python-injection</a></li>
+    <li><a href='/ssti'>Server-side template injection</a></li>
+    <li><a href='/path_traversal'>path-traversal</a></li>
+    <li><a href='/ssrf'>Server-Side request forgery</a></li>
+  </ul>
+</nav>
+<section id='section'>
+<div>
+<h2> Vulnerable Web-Application </h2>
+</div>
+</section>
+<form onsubmit=send(event)>
+<input id='payload' placeholder='payload'>
+</form>
+<h2> Output </h2>
+<h2> tmp </h2>
+<script>
+let div = document.createElement('div')
+let h1 = document.createElement('h1')
+let name = window.location.href.split('/')[3]
+if(name.includes('?')) {
+    h1.innerHTML = name.split('?')[0]
+} else {
+    h1.innerHTML = name
+}
+
+div.appendChild(h1)
+document.getElementById('section').appendChild(div)
+function send(event) {
+    event.preventDefault();
+    let payload = document.getElementById('payload').value;
+    if(window.location.href.includes('?')) {
+        let str = window.location.href.split('?')[0] + `?payload=${btoa(payload)}`
+        window.location.href = str
+    } else {window.location.href = window.location.href+`?payload=${btoa(payload)}`}
+    
+}
+</script>
+</body>
+</html>
+

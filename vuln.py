@@ -1,9 +1,25 @@
-from flask import Flask, jsonify, request # For Front/Back End
+from flask import Flask, jsonify, request, render_template, make_response # For Front/Back End
 import sqlite3 # for SQL-Injection
 import os # for OS-Injection
 import time # for time based Python
 import base64 # to encode all traffic in b64
 import requests # for ssrf
+
+
+
+def sanitize(ui):
+	ui = str(ui)
+	#if(len(ui) > 40): print("to long"); return True
+	# Only really Important are {} and ;
+	# the rest is to prevent exploitation
+	badstring = "!@#$%^&*+={|<>};:'"
+	badstring += '"'
+	for char in ui:
+		if char in badstring:
+			print(f"bad character {char}")
+			return True
+	return False
+
 
 # Setup
 
@@ -14,8 +30,8 @@ conn = sqlite3.connect('vulnerable-database.db')
 c = conn.cursor()
 
 c.execute('DROP TABLE IF EXISTS users')
-c.execute('CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, username TEXT, password TEXT)')
-c.execute('INSERT INTO users (username, password) VALUES ("test", "test")')
+c.execute('CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, username TEXT, password TEXT, description TEXT, website TEXT)')
+c.execute('INSERT INTO users (username, password, description, website) VALUES ("test", "test", "test", "http://test.test.test")')
 
 conn.commit()
 conn.close()
@@ -65,6 +81,7 @@ default = '''
 <body>
 <nav>
   <ul>
+    <button onclick="window.location.href = '/f'">Actual</button>
     <li><a href='/xss-reflected'>xss-reflected</a></li>
     <li><a href='/xss-stored'>xss-stored</a></li>
     <li><a href='/sql-injection'>sql-injection</a></li>
@@ -139,12 +156,18 @@ default_f = '''
       width: 70vw; /* Adjust as needed */
       text-align: center;
     }
+    button {
+        background-color: blue;
+        color: white;
+        border: 1px solid;
+    }
   </style>
   <title>Vulnerable Web Application</title>
 </head>
 <body>
 <nav>
   <ul>
+  <button onclick="window.location.href = '/'">Obvious</button>
     <li><a href='/xss-reflected'>xss-reflected</a></li>
     <li><a href='/xss-stored'>xss-stored</a></li>
     <li><a href='/sql-injection'>sql-injection</a></li>
@@ -159,10 +182,13 @@ default_f = '''
 <h2> Vulnerable Web-Application </h2>
 </div>
 </section>
-<form onsubmit=send(event) style="display:flex;flex-wrap:wrap">
-<label>Username:    </label>   <input placeholder='Username'>
-<label>Password:    </label>   <input placeholder='Password'>
-<label>Website :    </label>   <input placeholder='Website'>
+<h3>Register for the Application</h3>
+<form onSubmit="send(event)">
+<div style="margin-top:3vh"><label>Username:        </label>   <input id=user placeholder='Username'></div> <br>
+<div style="margin-top:3vh"><label>Password:        </label>   <input id=pass placeholder='Password'></div> <br>
+<div style="margin-top:3vh"><label>Website :        </label>   <input id=webpage placeholder='Website'> </div> <br>
+<div style="margin-top:3vh"><label>Description :    </label>   <input id=desc placeholder='Website'> </div> <br>
+<button type=submit>submit</button>
 </form>
 <h2> Output </h2>
 <h2> tmp </h2>
@@ -180,11 +206,11 @@ div.appendChild(h1)
 document.getElementById('section').appendChild(div)
 function send(event) {
     event.preventDefault();
-    let payload = document.getElementById('payload').value;
     if(window.location.href.includes('?')) {
-        let str = window.location.href.split('?')[0] + `?payload=${btoa(payload)}`
+        let str = window.location.href.split('?')[0] + `?user=${btoa(document.getElementById('user').value)}&pass=${btoa(document.getElementById('pass').value)}&website=${btoa(document.getElementById('webpage').value)}&desc=${btoa(document.getElementById('desc').value)}`
+        alert(str)
         window.location.href = str
-    } else {window.location.href = window.location.href+`?payload=${btoa(payload)}`}
+    } else {window.location.href = window.location.href+`?user=${btoa(document.getElementById('user').value)}&pass=${btoa(document.getElementById('pass').value)}&website=${btoa(document.getElementById('webpage').value)}&desc=${btoa(document.getElementById('desc').value)}`}
     
 }
 </script>
@@ -193,8 +219,11 @@ function send(event) {
 
 '''
 
+with open('default.html','w') as d:
+    d.write(default)
 
-
+with open('default-f.html','w') as d:
+    d.write(default_f)
 
 
 xss_stored_value = ''
@@ -235,19 +264,73 @@ def os_injection():
 def os_injectionf():
     try:
         #print(base64.b64decode(request.args.get('payload')).decode('utf-8'))
-        payload = base64.b64decode(request.args.get('payload')).decode('utf-8')
+        print('getting the values from the form')
+        try:
+            user, password, webpage, desc = base64.b64decode(request.args.get('user')).decode('utf-8'), base64.b64decode(request.args.get('pass')).decode('utf-8'), base64.b64decode(request.args.get('website')).decode('utf-8'), base64.b64decode(request.args.get('desc')).decode('utf-8')
+            if(user == None or password == None or webpage == None or desc == None):
+                return default_f.replace('tmp', 'Invalid data provided')
+            if(user == '' or password == '' or webpage == '' or desc == ''):
+                return default_f.replace('tmp', 'Invalid data provided')
+        except:
+            print('not all values were present')
+            print(password)
+        payload = webpage
+        print(user, password, webpage, desc)
+        conn = sqlite3.connect('vulnerable-database.db')
+        try:
+            if not (sanitize(user) and sanitize(password) and sanitize(desc)):
+                print('values clean')
+                cursor = conn.cursor()
+                print(f'INSERT INTO users (username, password, description) VALUES ("{user}", "{password}","{desc}")')
+                cursor.execute(f'INSERT INTO users (username, password, description) VALUES ("{user}", "{password}","{desc}")')
+                conn.commit()
+                conn.close()
+        except Exception as e:
+            print(e)
+            conn.close()
+            
         if(log): 
             l = f'Using payload: {payload} on /os-injection-f'
             log_data(l)
             print(l)
-        os.system(f'ping {payload} > .output.txt')
-        output = ''
-        with open('.output.txt', 'r') as f:
-            for line in f:
-                output += line.replace('\r', '') # .replace('\n','')
-        return default_f.replace('tmp', output)
+        os.system(f'ping -n 1 {payload} > .output.txt')
+        output = os.popen(f'ping -n 1 {payload}').read()
+        print(output)
+        html = default_f.replace('tmp', f'<script>localStorage.setItem("key", "{user + ";" + password}");</script>tmp').replace('tmp', output)
+        resp = make_response(html)
+        resp.set_cookie('key', user + ";" + password)
+        return resp
     except:
-        return default_f.replace("<label>Website : </label><input placeholder='Website'>", "<label>Website : </label><input id='payload' placeholder='Website'>")
+        return default_f.replace('SITE', 'os-injection-f')
+    
+@app.route('/profile')
+def profile():
+    try:
+        username, password = request.cookies.get('key').split(';',1)
+        print(username, password)
+        if(username == None or username == '' or password == None or password == ''):
+            print('b')
+            int('B')
+    except:
+        try:
+            username, password = request.args.get('key').split(';', 1)
+        except:
+            return default_f.replace('tmp', 'something went wrong, please try again')
+            
+    try:
+        if not (sanitize(username) or sanitize(password)):
+            print(f'select * from users where username = "{username}" and password = "{password}"')
+            data = execute_sql(f'select * from users where username = "{username}" and password = "{password}"')
+            data = data[0]
+            print(data[0])
+            username, password, description = data[1],data[2],data[3]
+            data = str(data)
+            print(data)
+            return f'<html><body><h2>Hello {username}<h2><p>{description}</p></body></html>'
+        
+    except:
+        return default_f
+    return default_f
 
 
 @app.route('/xss-reflected')
@@ -289,14 +372,18 @@ def ssti():
             log_data(l)
             print(l)
         ssti = f'payload: {payload}' + payload
+        try:
+            ssti = render_template('payload' + payload)
+        except Exception as e:
+            print(e)
         return default.replace('tmp', ssti)
     except:
         return default.replace('tmp', 'ServerSide Template Injection is a vulnerability that a malicious user can send requests from the server, which can lead to pivoting or information disclosure, if it doesn\'t reveal information its less bad, but still maybe a vulnerability')
 
+        s = ''
 @app.route('/python-injection')
 def python_injection():
     try:
-        s = ''
         payload = base64.b64decode(request.args.get('payload')).decode('utf-8')
         if(log): 
             l = f'Using payload: {payload} on /python-injection'
@@ -349,7 +436,7 @@ def execute_sql(query):
 def sqli():
     return_value = ''
     try:
-        payload = request.args.get('payload')
+        payload = base64.b64decode(request.args.get('payload')).decode('utf-8')
         if(log): 
             l = f'Using payload: {payload} on /sql-injection'
             log_data(l)
@@ -359,6 +446,28 @@ def sqli():
     except:
             return default.replace('tmp', 'SQL-Injection is an vulnerability where a malicious user can exploit a SQL-Query by submitting an specific Value for example as username. The issue is that its possible to break out of the query')
     try:
+        try:
+            print(f"Query: SELECT * FROM users WHERE id = '{payload}'")
+            data = execute_sql(f"SELECT * FROM users WHERE id = '{payload}'")
+            data = str(data)
+            print(data, type(data))
+        except Exception as e:
+            data = f'Error: {e}'
+        try:
+            # username', 'passwort') OR 1=1 -- 
+            print(f"Query: INSERT INTO users (username, password, biography) VALUES ('{payload}', 'Injection', 'new user')")
+            tmp = execute_sql(f"INSERT INTO users (username, password, biography) VALUES ('{payload}','Injection', 'new user')")
+            if(tmp == []):
+                conn.commit()
+                tmp = execute_sql('SELECT * FROM users order by id desc')
+                data += str(tmp)
+                print(data, type(data))
+            else:
+                print('there was some weird stuff going on in the query')
+
+        except Exception as e:
+            data += f'Error: {e}'
+        return default.replace('tmp', 'data:' + str(data)), 200
         queries = ['SELECT * FROM users WHERE username = "payload"', 'INSERT INTO users (username) VALUES ("payload")']
         for query in queries:
             query = query.replace('payload', payload)
@@ -367,7 +476,7 @@ def sqli():
                 print(data)
         return default.replace('tmp', f'results: {data}')
     except:
-        return default.replace('tmp', 'error'), 500
+        return default.replace('tmp', 'Test'), 500
     
 
 
